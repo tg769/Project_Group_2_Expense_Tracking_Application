@@ -25,14 +25,20 @@ export default function ExpenseList({ expenses, editingId, onEdit, onDelete }) {
         {sorted.map((expense) => (
           <tr key={expense.id} className={expense.id === editingId ? 'row-editing' : undefined}>
             <td>{formatDate(expense.expense_date)}</td>
-            <td>{expense.category}</td>
+            <td>
+              <span className="badge">{expense.category}</span>
+            </td>
             <td>{formatCurrency(expense.amount)}</td>
             <td>{expense.description}</td>
             <td className="actions">
               <button type="button" className="btn btn-small" onClick={() => onEdit(expense.id)}>
                 Edit
               </button>
-              <button type="button" className="btn btn-small" onClick={() => onDelete(expense.id)}>
+              <button
+                type="button"
+                className="btn btn-small btn-danger"
+                onClick={() => onDelete(expense.id)}
+              >
                 Delete
               </button>
             </td>

@@ -1,6 +1,5 @@
 import { useState } from 'react'
-
-const CATEGORIES = ['Groceries', 'Utilities', 'Transport', 'Entertainment', 'Rent']
+import CategoryDropdown from './CategoryDropdown'
 
 const emptyValues = { amount: '', category: '', expense_date: '', description: '' }
 
@@ -18,7 +17,7 @@ function validate(values) {
 
 // Used for both adding and editing. When `expense` is passed, its values are
 // loaded into the form. The parent remounts the form (via `key`) to reset it.
-export default function ExpenseForm({ expense, onSave, onCancel }) {
+export default function ExpenseForm({ expense, categories, onSave, onCancel }) {
   const [values, setValues] = useState(
     expense
       ? {
@@ -42,7 +41,7 @@ export default function ExpenseForm({ expense, onSave, onCancel }) {
     setErrors(found)
     if (Object.keys(found).length > 0) return
     onSave({
-      amount: Number(Number(values.amount).toFixed(2)),
+      amount: Number(values.amount),
       category: values.category,
       expense_date: values.expense_date,
       description: values.description.trim(),
@@ -66,14 +65,14 @@ export default function ExpenseForm({ expense, onSave, onCancel }) {
       {errors.amount && <p className="error">{errors.amount}</p>}
 
       <label htmlFor="category">Category</label>
-      <select id="category" name="category" value={values.category} onChange={handleChange}>
-        <option value="">Select category</option>
-        {CATEGORIES.map((name) => (
-          <option key={name} value={name}>
-            {name}
-          </option>
-        ))}
-      </select>
+      <CategoryDropdown
+        id="category"
+        name="category"
+        categories={categories}
+        value={values.category}
+        onChange={handleChange}
+        placeholder="Select category"
+      />
       {errors.category && <p className="error">{errors.category}</p>}
 
       <label htmlFor="expense_date">Date</label>

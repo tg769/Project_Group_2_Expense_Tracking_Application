@@ -2,7 +2,13 @@ import { useState } from 'react'
 import ExpenseForm from '../components/ExpenseForm'
 import ExpenseList from '../components/ExpenseList'
 
-export default function ExpensesPage({ expenses, addExpense, updateExpense, deleteExpense }) {
+export default function ExpensesPage({
+  expenses,
+  addExpense,
+  updateExpense,
+  deleteExpense,
+  categories,
+}) {
   const [editingId, setEditingId] = useState(null)
   // Bumped to remount (clear) the form when adding.
   const [formKey, setFormKey] = useState(0)
@@ -48,6 +54,7 @@ export default function ExpensesPage({ expenses, addExpense, updateExpense, dele
       <ExpenseForm
         key={editingExpense ? `edit-${editingExpense.id}` : `new-${formKey}`}
         expense={editingExpense}
+        categories={categories}
         onSave={handleSave}
         onCancel={resetForm}
       />
