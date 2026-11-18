@@ -1,25 +1,56 @@
-import { useState } from 'react'
-import { mockExpenses } from '../data/mockExpenses'
+import { useEffect, useState } from 'react'
+import { apiRequest } from '../api'
 
-// All expense data goes through this hook. In Phase 2 only the bodies of
-// these functions change (to fetch calls); the pages keep using the same API.
+// All expense data goes through this hook. It loads the expenses from the
+// API and keeps the list in React state in sync after each change.
 export function useExpenses() {
-  const [expenses, setExpenses] = useState(mockExpenses)
+  const [expenses, setExpenses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  function addExpense(expense) {
-    setExpenses((prev) => {
-      const nextId = prev.reduce((max, e) => Math.max(max, e.id), 0) + 1
-      return [...prev, { ...expense, id: nextId }]
-    })
+  useEffect(() => {
+    apiRequest('/expenses')
+      .then((data) => setExpenses(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  // Each function returns true if it worked, so the page knows whether to reset the form
+  async function addExpense(expense) {
+    try {
+      const saved = await apiRequest('/expenses', 'POST', expense)
+      setExpenses((prev) => [...prev, saved])
+      setError(null)
+      return true
+    } catch (err) {
+      setError(err.message)
+      return false
+    }
   }
 
-  function updateExpense(id, changes) {
-    setExpenses((prev) => prev.map((e) => (e.id === id ? { ...e, ...changes, id } : e)))
+  async function updateExpense(id, changes) {
+    try {
+      const saved = await apiRequest(`/expenses/${id}`, 'PUT', changes)
+      setExpenses((prev) => prev.map((e) => (e.id === id ? saved : e)))
+      setError(null)
+      return true
+    } catch (err) {
+      setError(err.message)
+      return false
+    }
   }
 
-  function deleteExpense(id) {
-    setExpenses((prev) => prev.filter((e) => e.id !== id))
+  async function deleteExpense(id) {
+    try {
+      await apiRequest(`/expenses/${id}`, 'DELETE')
+      setExpenses((prev) => prev.filter((e) => e.id !== id))
+      setError(null)
+      return true
+    } catch (err) {
+      setError(err.message)
+      return false
+    }
   }
 
-  return { expenses, addExpense, updateExpense, deleteExpense }
+  return { expenses, loading, error, addExpense, updateExpense, deleteExpense }
 }

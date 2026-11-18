@@ -4,6 +4,8 @@ import ExpenseList from '../components/ExpenseList'
 
 export default function ExpensesPage({
   expenses,
+  loading,
+  error,
   addExpense,
   updateExpense,
   deleteExpense,
@@ -20,18 +22,20 @@ export default function ExpensesPage({
     setFormKey((k) => k + 1)
   }
 
-  function handleSave(data) {
+  async function handleSave(data) {
+    let ok
     if (editingExpense) {
-      updateExpense(editingExpense.id, data)
+      ok = await updateExpense(editingExpense.id, data)
     } else {
-      addExpense(data)
+      ok = await addExpense(data)
     }
-    resetForm()
+    // keep the form filled in if the save failed
+    if (ok) resetForm()
   }
 
-  function handleDelete(id) {
-    deleteExpense(id)
-    if (id === editingId) resetForm()
+  async function handleDelete(id) {
+    const ok = await deleteExpense(id)
+    if (ok && id === editingId) resetForm()
   }
 
   return (
@@ -43,12 +47,17 @@ export default function ExpensesPage({
             + Add Expense
           </button>
         </div>
-        <ExpenseList
-          expenses={expenses}
-          editingId={editingId}
-          onEdit={setEditingId}
-          onDelete={handleDelete}
-        />
+        {error && <p className="error-banner">{error}</p>}
+        {loading ? (
+          <p className="empty">Loading expenses...</p>
+        ) : (
+          <ExpenseList
+            expenses={expenses}
+            editingId={editingId}
+            onEdit={setEditingId}
+            onDelete={handleDelete}
+          />
+        )}
       </section>
 
       <ExpenseForm
