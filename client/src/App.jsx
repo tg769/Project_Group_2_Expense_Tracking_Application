@@ -30,8 +30,8 @@ export default function App() {
             />
           }
         />
-        <Route path="summary" element={<SummaryPage expenses={expenses} />} />
-        <Route path="charts" element={<ChartsPage expenses={expenses} />} />
+        <Route path="summary" element={<SummaryPage />} />
+        <Route path="charts" element={<ChartsPage />} />
       </Route>
     </Routes>
   )

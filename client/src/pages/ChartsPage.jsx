@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { apiRequest } from '../api'
 import ChartCanvas from '../components/ChartCanvas'
-import { formatMonth, latestMonth, monthOf, shiftMonth, totalsByCategory } from '../utils/months'
+import { formatCurrency, formatDate } from '../utils/format'
+import { currentMonth, formatMonth } from '../utils/months'
 
 const COLORS = ['#4f46e5', '#f08a3c', '#2fa37a', '#d9486b', '#9b6bdf', '#e0b030', '#2fa8c4', '#7a8194']
 
@@ -15,50 +17,61 @@ const barOptions = {
   scales: { y: { beginAtZero: true } },
 }
 
-export default function ChartsPage({ expenses }) {
-  const [month, setMonth] = useState(latestMonth(expenses))
+export default function ChartsPage() {
+  const [month, setMonth] = useState(currentMonth())
+  const [monthOptions, setMonthOptions] = useState([currentMonth()])
+  // The chart data is kept in state so the charts are only redrawn when new data loads
+  const [pieData, setPieData] = useState(null)
+  const [barData, setBarData] = useState(null)
+  const [drillCategory, setDrillCategory] = useState(null)
+  const [drillExpenses, setDrillExpenses] = useState([])
+  const [error, setError] = useState(null)
 
-  // list of months that have expenses, newest first
-  const monthOptions = []
-  for (const e of expenses) {
-    const m = monthOf(e.expense_date)
-    if (!monthOptions.includes(m)) monthOptions.push(m)
-  }
-  if (!monthOptions.includes(month)) monthOptions.push(month)
-  monthOptions.sort().reverse()
+  // Bar chart: total per month (also gives us the months for the dropdown)
+  useEffect(() => {
+    apiRequest('/charts/monthly')
+      .then((rows) => {
+        setBarData({
+          labels: rows.map((r) => formatMonth(r.month, 'short')),
+          datasets: [{ data: rows.map((r) => r.amount), backgroundColor: COLORS[0] }],
+        })
 
-  // pie chart: total per category for the selected month
-  const monthExpenses = expenses.filter((e) => monthOf(e.expense_date) === month)
-  const categoryTotals = totalsByCategory(monthExpenses)
-  const pieData = {
-    labels: categoryTotals.map((t) => t.category),
-    datasets: [
-      {
-        data: categoryTotals.map((t) => t.amount),
-        backgroundColor: categoryTotals.map((t, i) => COLORS[i % COLORS.length]),
-      },
-    ],
-  }
+        const months = rows.map((r) => r.month)
+        if (!months.includes(currentMonth())) months.push(currentMonth())
+        months.sort().reverse()
+        setMonthOptions(months)
+      })
+      .catch((err) => setError(err.message))
+  }, [])
 
-  // bar chart: total per month, from the first month with an expense to the last
-  const monthLabels = []
-  const monthTotals = []
-  if (expenses.length > 0) {
-    const first = monthOptions[monthOptions.length - 1]
-    const last = latestMonth(expenses)
-    let m = first
-    while (m <= last) {
-      const total = expenses
-        .filter((e) => monthOf(e.expense_date) === m)
-        .reduce((sum, e) => sum + e.amount, 0)
-      monthLabels.push(formatMonth(m, 'short'))
-      monthTotals.push(total)
-      m = shiftMonth(m, 1)
-    }
-  }
-  const barData = {
-    labels: monthLabels,
-    datasets: [{ data: monthTotals, backgroundColor: COLORS[0] }],
+  // Pie chart: total per category for the selected month
+  useEffect(() => {
+    apiRequest(`/charts/category?month=${month}`)
+      .then((rows) => {
+        setPieData({
+          labels: rows.map((r) => r.category),
+          datasets: [
+            {
+              data: rows.map((r) => r.amount),
+              backgroundColor: rows.map((r, i) => COLORS[i % COLORS.length]),
+            },
+          ],
+        })
+      })
+      .catch((err) => setError(err.message))
+  }, [month])
+
+  // Drill-down: load the expenses for the clicked category and month
+  useEffect(() => {
+    if (!drillCategory) return
+    apiRequest(`/expenses?category=${encodeURIComponent(drillCategory)}&month=${month}`)
+      .then((data) => setDrillExpenses(data))
+      .catch((err) => setError(err.message))
+  }, [drillCategory, month])
+
+  function handleMonthChange(event) {
+    setMonth(event.target.value)
+    setDrillCategory(null)
   }
 
   return (
@@ -69,7 +82,7 @@ export default function ChartsPage({ expenses }) {
           className="month-select"
           aria-label="Month"
           value={month}
-          onChange={(e) => setMonth(e.target.value)}
+          onChange={handleMonthChange}
         >
           {monthOptions.map((m) => (
             <option key={m} value={m}>
@@ -79,28 +92,54 @@ export default function ChartsPage({ expenses }) {
         </select>
       </div>
 
+      {error && <p className="error-banner">{error}</p>}
+
       <div className="charts">
         <section className="panel">
           <h2>Spending by category ({formatMonth(month)})</h2>
           <div className="chart-box">
-            {pieData.labels.length === 0 ? (
+            {pieData && pieData.labels.length === 0 && (
               <p className="empty">No expenses this month.</p>
-            ) : (
-              <ChartCanvas type="pie" data={pieData} options={pieOptions} />
+            )}
+            {pieData && pieData.labels.length > 0 && (
+              <ChartCanvas
+                type="pie"
+                data={pieData}
+                options={pieOptions}
+                onClick={setDrillCategory}
+              />
             )}
           </div>
         </section>
         <section className="panel">
           <h2>Spending per month</h2>
           <div className="chart-box">
-            {barData.labels.length === 0 ? (
-              <p className="empty">No expenses yet.</p>
-            ) : (
+            {barData && barData.labels.length === 0 && <p className="empty">No expenses yet.</p>}
+            {barData && barData.labels.length > 0 && (
               <ChartCanvas type="bar" data={barData} options={barOptions} />
             )}
           </div>
         </section>
       </div>
+
+      {drillCategory && (
+        <section className="panel drill">
+          <h2>
+            Drill-down: {drillCategory}, {formatMonth(month)}
+          </h2>
+          <table className="table group-table">
+            <tbody>
+              {drillExpenses.map((e) => (
+                <tr key={e.id}>
+                  <td>{formatDate(e.expense_date)}</td>
+                  <td>{e.description}</td>
+                  <td className="num">{formatCurrency(e.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
     </div>
   )
 }

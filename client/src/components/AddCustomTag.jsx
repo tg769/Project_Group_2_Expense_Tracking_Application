@@ -4,9 +4,9 @@ export default function AddCustomTag({ onAdd }) {
   const [name, setName] = useState('')
   const [error, setError] = useState(null)
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
-    const message = onAdd(name)
+    const message = await onAdd(name)
     setError(message)
     if (!message) setName('')
   }

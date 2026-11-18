@@ -473,6 +473,15 @@ textarea {
   height: 300px;
 }
 
+.drill {
+  margin-top: 16px;
+}
+
+.drill .group-table {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 @media (max-width: 800px) {
   .expenses-layout,
   .toolbar,

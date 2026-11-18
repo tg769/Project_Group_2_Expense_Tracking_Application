@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { apiRequest } from '../api'
 import { formatCurrency } from '../utils/format'
-import { daysInMonth, formatMonth, latestMonth, monthOf, shiftMonth, totalsByCategory } from '../utils/months'
+import { currentMonth, formatMonth, shiftMonth } from '../utils/months'
 
-export default function SummaryPage({ expenses }) {
-  const [month, setMonth] = useState(() => latestMonth(expenses))
+export default function SummaryPage() {
+  const [month, setMonth] = useState(currentMonth())
+  const [summary, setSummary] = useState(null)
+  const [error, setError] = useState(null)
 
-  const monthExpenses = expenses.filter((e) => monthOf(e.expense_date) === month)
-  const total = monthExpenses.reduce((sum, e) => sum + e.amount, 0)
-  const averageDaily = total / daysInMonth(month)
-  const breakdown = totalsByCategory(monthExpenses)
+  // Load the summary from the API whenever the month changes
+  useEffect(() => {
+    apiRequest(`/summary?month=${month}`)
+      .then((data) => {
+        setSummary(data)
+        setError(null)
+      })
+      .catch((err) => setError(err.message))
+  }, [month])
 
   return (
     <div>
@@ -35,53 +43,60 @@ export default function SummaryPage({ expenses }) {
         </div>
       </div>
 
-      <div className="cards">
-        <div className="panel card">
-          <span>Total Spending</span>
-          <strong>{formatCurrency(total)}</strong>
-        </div>
-        <div className="panel card">
-          <span>Average Daily Spend</span>
-          <strong>{formatCurrency(averageDaily)}</strong>
-        </div>
-        <div className="panel card">
-          <span>Number of Expenses</span>
-          <strong>{monthExpenses.length}</strong>
-        </div>
-      </div>
+      {error && <p className="error-banner">{error}</p>}
+      {!summary && !error && <p className="empty">Loading summary...</p>}
 
-      <h2>Breakdown by category</h2>
-      {breakdown.length === 0 ? (
-        <p className="empty">No expenses this month.</p>
-      ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Amount</th>
-              <th>Share of total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {breakdown.map(({ category, amount }) => {
-              const share = (amount / total) * 100
-              return (
-                <tr key={category}>
-                  <td>{category}</td>
-                  <td>{formatCurrency(amount)}</td>
-                  <td>
-                    <div className="share">
-                      <div className="share-bar">
-                        <div className="share-fill" style={{ width: `${share}%` }} />
-                      </div>
-                      <span>{Math.round(share)}%</span>
-                    </div>
-                  </td>
+      {summary && (
+        <>
+          <div className="cards">
+            <div className="panel card">
+              <span>Total Spending</span>
+              <strong>{formatCurrency(summary.total)}</strong>
+            </div>
+            <div className="panel card">
+              <span>Average Daily Spend</span>
+              <strong>{formatCurrency(summary.average_daily)}</strong>
+            </div>
+            <div className="panel card">
+              <span>Number of Expenses</span>
+              <strong>{summary.count}</strong>
+            </div>
+          </div>
+
+          <h2>Breakdown by category</h2>
+          {summary.breakdown.length === 0 ? (
+            <p className="empty">No expenses this month.</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Share of total</th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {summary.breakdown.map((row) => {
+                  const share = (row.amount / summary.total) * 100
+                  return (
+                    <tr key={row.category}>
+                      <td>{row.category}</td>
+                      <td>{formatCurrency(row.amount)}</td>
+                      <td>
+                        <div className="share">
+                          <div className="share-bar">
+                            <div className="share-fill" style={{ width: `${share}%` }} />
+                          </div>
+                          <span>{Math.round(share)}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
     </div>
   )

@@ -4,7 +4,7 @@ import pool from '../db.js'
 const router = express.Router()
 
 // Columns sent back to the client. amount is turned into a number and the
-// date into a 'YYYY-MM-DD' string so the frontend gets the same shape as before.
+// date into a 'YYYY-MM-DD' string so the frontend gets simple values.
 const SELECT_EXPENSE = `
   SELECT e.id, e.amount::float AS amount, c.name AS category,
          TO_CHAR(e.expense_date, 'YYYY-MM-DD') AS expense_date, e.description
@@ -45,9 +45,32 @@ async function findExpense(id) {
 }
 
 // GET /api/expenses
+// Optional filters: ?category=Groceries&month=YYYY-MM (used by the chart drill-down)
 router.get('/', async (req, res) => {
+  const { category, month } = req.query
+  if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    return res.status(400).json({ error: 'month must be in YYYY-MM format.' })
+  }
+
+  const conditions = []
+  const values = []
+  if (category) {
+    values.push(category)
+    conditions.push(`c.name = $${values.length}`)
+  }
+  if (month) {
+    values.push(month)
+    conditions.push(`TO_CHAR(e.expense_date, 'YYYY-MM') = $${values.length}`)
+  }
+
+  let sql = SELECT_EXPENSE
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(' AND ')}`
+  }
+  sql += ' ORDER BY e.expense_date DESC, e.id DESC'
+
   try {
-    const result = await pool.query(`${SELECT_EXPENSE} ORDER BY e.expense_date DESC, e.id DESC`)
+    const result = await pool.query(sql, values)
     res.json(result.rows)
   } catch (err) {
     console.error(err)
